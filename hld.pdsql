@@ -1,0 +1,94 @@
+URL-Shortener
+├─ 1. Requirements
+│   ├─ 1.1 Functional
+│   │   ├─ Shorten a long URL → short code
+│   │   ├─ Redirect short code → original URL
+│   │   ├─ Track basic analytics (clicks, timestamps, IP/UA)          ▷ nice-to-have
+│   │   └─ Optional: custom alias, expiry, user auth
+│   └─ 1.2 Non-Functional
+│       ├─ Read-heavy: 90 %+ traffic = redirects
+│       ├─ P99 redirect < 50 ms
+│       ├─ 99.99 % availability
+│       ├─ Horizontal scalability to 10 k RPS and beyond
+│       ├─ Data durability (no link loss) & eventual analytics accuracy
+│       └─ Abuse protection (rate-limit, malicious links)
+├─ 2. API (REST/JSON, minimal)
+│   ├─ POST /api/shorten   { longUrl }          → { shortCode, shortUrl }
+│   ├─ GET  /{shortCode}                       → 302 / 301 redirect
+│   └─ GET  /api/stats/{shortCode}             → { clicks, createdAt, … }
+├─ 3. Component Topology
+│   ├─ Clients (browser / mobile / cURL)
+│   ├─ Edge
+│   │   ├─ CDN (optional; caches 301/302 for hot links)
+│   │   └─ Global Load Balancer / Anycast
+│   ├─ App Tier (stateless; auto-scaled)
+│   │   └─ URL Service (Node/Go/Java)
+│   │       ├─ ShortenHandler
+│   │       ├─ RedirectHandler
+│   │       └─ StatsHandler
+│   ├─ Cache Tier
+│   │   └─ Redis / KeyDB cluster (read-through, 24 h TTL)
+│   ├─ Persistence
+│   │   ├─ Primary DB (choose one)
+│   │   │   ├─ MongoDB-sharded  (PK = shortCode)
+│   │   │   ├─ DynamoDB / Cosmos / Cloud Bigtable
+│   │   │   └─ Postgres-Citus / Cockroach (hash-partition code)
+│   │   └─ ID-Generator
+│   │       ├─ Redis atomic counter + Base62   ▷ monotonic, cheap
+│   │       ├─ NanoID (no coordination)       ▷ random, collision P≈0
+│   │       └─ Snowflake service              ▷ time-ordered, 64-bit
+│   ├─ Analytics Pipeline (async)
+│   │   ├─ Redirect emits “click” to Kafka/Kinesis
+│   │   ├─ Stream processor → OLAP (ClickHouse / Druid)
+│   │   └─ Grafana / Superset dashboard
+│   └─ Ops
+│       ├─ Prometheus + Alertmanager (metrics)
+│       ├─ OpenTelemetry tracing
+│       └─ Loki / ELK for logs
+├─ 4. Data Flow
+│   ├─ Shorten
+│   │   1. Validate URL
+│   │   2. Generate ID (ID-Generator)
+│   │   3. Persist {code,url,…} in DB (write ≈ 1 ms)
+│   │   4. Prime Redis (EX = 24 h)
+│   │   5. Return short URL
+│   └─ Redirect (hot path)
+│       1. GET /abc123 hits LB
+│       2. App → Redis.get(code)
+│          ├─ Hit ⇒ res.redirect(longUrl)  (<10 ms)
+│          └─ Miss ⇒
+│              a. DB lookup (≈ 2 ms)
+│              b. Redis.set(code,longUrl,EX=24 h)
+│              c. res.redirect
+│       3. Fire-and-forget analytics event
+├─ 5. Scaling & Partitioning
+│   ├─ App Tier scales stateless via container orchestration (K8s/Fargate)
+│   ├─ Redis: Cluster mode, hash-slot sharding; replicas for HA
+│   ├─ DB: hash-partition on shortCode; add global-secondary-index on longUrl for dedup
+│   └─ CDN caches 301/302 to offload 80 %+ traffic on viral links
+├─ 6. Consistency & Failure Modes
+│   ├─ Redirect path uses **cache-aside**; if Redis down ⇒ DB fallback (slower, still correct)
+│   ├─ DB writes are single-row => atomic
+│   ├─ ID-Generator redundancy: two strategies in parallel (counter + NanoID) to avoid single-point
+│   └─ Graceful degradation: if DB unavailable, new shorten requests return 503; redirects keep working from cache
+├─ 7. Security & Abuse Control
+│   ├─ HTTPS everywhere
+│   ├─ Rate-limit `/shorten` by IP / user key (Redis token-bucket)
+│   ├─ Malware & phishing detection (Google Safe Browsing API) before persisting
+│   └─ Admin API to deactivate or delete abusive codes
+└─ 8. Deployment & DevOps
+    ├─ IaC: Terraform / CloudFormation
+    ├─ CI: GitHub Actions – lint, unit, integration, container build
+    ├─ Blue-green or canary deploy
+    └─ Chaos tests: kill Redis node, ensure redirect still < 200 ms
+
+**Trade-offs to call out in discussion**
+
+| Decision | Alternative | Why chosen |
+|----------|-------------|-----------|
+| Redis Cache | memcached | Supports atomic counter & persistence; familiar ops |
+| Base62 counter | UUID-v4 | Smaller code length, time-ordered keys aid cache locality |
+| Document DB | RDBMS | Simpler schema, native sharding, auto-scale |
+
+
+Use this tree as the “HLD backbone”; dive deeper into any box (e.g., ID-Generator or Analytics) when interviewers probe.
