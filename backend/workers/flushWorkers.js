@@ -1,6 +1,6 @@
 require('dotenv').config();
 const redis = require('../src/config/redis');
-const Url   = require('../src/models/Url');
+const Url   = require('../src/models/url');
 
 async function flushOnce() {
   let cursor = '0';

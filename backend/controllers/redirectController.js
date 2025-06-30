@@ -1,5 +1,5 @@
 // controllers/redirectController.js
-const Url   = require('../models/Url');
+const Url   = require('../models/url');
 const redis = require('../config/redis');
 
 const ONE_DAY = 60 * 60 * 24; // seconds

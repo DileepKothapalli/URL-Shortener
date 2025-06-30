@@ -1,4 +1,4 @@
-const Url = require('../models/Url');
+const Url = require('../models/url');
 const { nanoid } = require('nanoid');
 const validator  = require('validator');
 const redis = require('../config/redis');
