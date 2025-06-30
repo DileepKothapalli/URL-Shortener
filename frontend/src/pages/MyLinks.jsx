@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { myUrls } from "../services/url";
+import { myUrls } from "../services/Url";
 import { ExternalLink, Copy, Check, ClipboardEdit } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";

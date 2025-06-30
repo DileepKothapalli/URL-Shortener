@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { shorten } from '../services/url';
+import { shorten } from '../services/Url';
 import toast from 'react-hot-toast';
 
 import {
