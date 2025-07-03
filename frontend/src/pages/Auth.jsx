@@ -15,137 +15,155 @@ import {
   Typography,
 } from "@mui/material";
 import LockIcon from "@mui/icons-material/Lock";
+import CircularProgress from "@mui/material/CircularProgress";
 
 export default function Auth() {
   const [mode, setMode] = useState("login"); // 'login' | 'signup'
   const [username, setUsername] = useState("");
   const [password, setPwd] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const nav = useNavigate();
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  setError('');               // clear previous error
+    e.preventDefault();
+    setError(""); // clear previous error
 
-  // quick front‑end validation
-  if (!username || !password) {
-    setError('username and password are required');
-    return;
-  }
+    // quick front‑end validation
+    if (!username || !password) {
+      setError("username and password are required");
+      return;
+    }
 
-  try {
-    // call the correct endpoint
-    const { token } =
-      mode === 'login'
-        ? await login({ username, password })
-        : await signup({ username, password });
+    setLoading(true);
+    try {
+      // call the correct endpoint
+      const { token } =
+        mode === "login"
+          ? await login({ username, password })
+          : await signup({ username, password });
 
-    // Bearer‑token style → save it
-    if (token) localStorage.setItem('token', token);
+      // Bearer‑token style → save it
+      if (token) localStorage.setItem("token", token);
 
-    // Cookie style → nothing to save; the cookie is set by the server
+      // Cookie style → nothing to save; the cookie is set by the server
 
-    nav('/my-links');
-  } catch (err) {
-    setError(err?.response?.data?.message || 'Something went wrong');
-  }
-};
+      nav("/my-links");
+    } catch (err) {
+      setError(err?.response?.data?.message || "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-return (
-  <Container
-    component="main"
-    maxWidth={false}          // ← full‑width, no max constraint
-    disableGutters            // ← remove the 16 px side padding
-    sx={{
-      minHeight: '100vh',     // full viewport height
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      bgcolor: 'grey.100',
-      padding: '0',
-      margin:'0'
-    }}
-  >
-    <Paper
-      elevation={6}
+  return (
+    <Container
+      component="main"
+      maxWidth={false} // ← full‑width, no max constraint
+      disableGutters // ← remove the 16 px side padding
       sx={{
-        p: 4,
-        width: '100%',         // allow it to shrink/grow inside container
-        maxWidth: 360,         // cap so it never becomes too wide
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        borderRadius: 3,
+        minHeight: "100vh", // full viewport height
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        bgcolor: "grey.100",
+        padding: "0",
+        margin: "0",
       }}
     >
-      <Avatar sx={{ m: 1, bgcolor: 'primary.main' }}>
-        <LockIcon />
-      </Avatar>
-
-      <Typography component="h1" variant="h5" fontWeight={600}>
-        {mode === 'login' ? 'Log in' : 'Sign up'}
-      </Typography>
-
-      <Box
-        component="form"
-        onSubmit={handleSubmit}
-        sx={{ mt: 2, width: '100%' }}
+      <Paper
+        elevation={6}
+        sx={{
+          p: 4,
+          width: "100%", // allow it to shrink/grow inside container
+          maxWidth: 360, // cap so it never becomes too wide
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          borderRadius: 3,
+        }}
       >
-        <TextField
-          label="Username"
-          margin="normal"
-          fullWidth
-          required
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-        />
+        <Avatar sx={{ m: 1, bgcolor: "primary.main" }}>
+          <LockIcon />
+        </Avatar>
 
-        <TextField
-          label="Password"
-          type="password"
-          margin="normal"
-          fullWidth
-          required
-          value={password}
-          onChange={(e) => setPwd(e.target.value)}
-        />
+        <Typography component="h1" variant="h5" fontWeight={600}>
+          {mode === "login" ? "Log in" : "Sign up"}
+        </Typography>
 
-        {error && (
-          <Typography color="error" variant="body2" sx={{ mt: 1 }}>
-            {error}
-          </Typography>
-        )}
-
-        <Button
-          type="submit"
-          fullWidth
-          variant="contained"
-          sx={{ mt: 3, mb: 2 }}
+        <Box
+          component="form"
+          onSubmit={handleSubmit}
+          sx={{ mt: 1, width: "100%" }}
         >
-          {mode === 'login' ? 'Log in' : 'Create account'}
-        </Button>
+          <TextField
+            label="Username"
+            margin="normal"
+            fullWidth
+            required
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
 
-        <Grid container justifyContent="flex-end">
-          <Grid item>
-            <Link
-              component="button"
-              type="button"
-              variant="body2"
-              onClick={() => {
-                setMode(mode === 'login' ? 'signup' : 'login');
-                setError('');
-              }}
-            >
-              {mode === 'login'
-                ? "Don't have an account? Sign up"
-                : 'Already have an account? Log in'}
-            </Link>
+          <TextField
+            label="Password"
+            type="password"
+            margin="normal"
+            fullWidth
+            required
+            value={password}
+            onChange={(e) => setPwd(e.target.value)}
+          />
+
+          {error && (
+            <Typography color="error" variant="body2" sx={{ mt: 1 }}>
+              {error}
+            </Typography>
+          )}
+
+          <Button
+            type="submit"
+            fullWidth
+            variant="contained"
+            sx={{ mt: 3, mb: 2 }}
+            disabled={loading}
+          >
+            {loading ? (
+              <CircularProgress size={24} color="inherit" />
+            ) : mode === "login" ? (
+              "Log in"
+            ) : (
+              "Create account"
+            )}
+          </Button>
+
+          <Grid container justifyContent="flex-end">
+            <Grid item>
+              <Link
+                component="button"
+                type="button"
+                variant="body2"
+                onClick={() => {
+                  setMode(mode === "login" ? "signup" : "login");
+                  setError("");
+                }}
+              >
+                {mode === "login"
+                  ? "Don't have an account? Sign up"
+                  : "Already have an account? Log in"}
+              </Link>
+            </Grid>
           </Grid>
-        </Grid>
-      </Box>
-    </Paper>
-  </Container>
-);
+        </Box>
 
-
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ mt: 2, textAlign: "center" }}
+        >
+          Demo credentials: <strong>demo</strong> / <strong>demo123</strong>
+        </Typography>
+      </Paper>
+    </Container>
+  );
 }

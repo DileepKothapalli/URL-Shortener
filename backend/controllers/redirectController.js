@@ -1,8 +1,28 @@
 // controllers/redirectController.js
 const Url   = require('../models/url');
 const redis = require('../config/redis');
+const { flushOnce } = require('../flushWorker'); 
 
 const ONE_DAY = 60 * 60 * 24; // seconds
+
+const FLUSH_INTERVAL = 30_000; // 30 s
+let   lastFlush      = 0;
+let   flushing       = null;   // in‑flight Promise
+
+function maybeFlush () {
+  const now = Date.now();
+  if (now - lastFlush < FLUSH_INTERVAL) return; // too soon
+  if (flushing) return;                         // already running
+
+  lastFlush = now;
+  // off‑load to next tick so redirect returns instantly
+  setImmediate(() => {
+    flushing = flushOnce()
+      .catch(err => console.error('flushOnce error', err))
+      .finally(() => { flushing = null; });
+  });
+}
+
 
 exports.redirectUrl = async (req, res) => {
   const { shortCode } = req.params;
@@ -24,6 +44,8 @@ exports.redirectUrl = async (req, res) => {
       target = doc.longUrl;
       await redis.set(shortCode, target, 'EX', ONE_DAY);
     }
+
+    maybeFlush();    
 
     /* 3️⃣  Redirect */
     res.redirect(target); // 302 by default

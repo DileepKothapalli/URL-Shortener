@@ -1,10 +1,32 @@
 const redis = require('../config/redis');
 
-module.exports = async function rateLimiter(req, res, next) {
-  const ip = req.ip;
-  const key = `rate:${ip}`;
-  const count = await redis.incr(key);
-  if (count === 1) await redis.expire(key, 60);
-  if (count > 100) return res.status(429).send('Too many requests');
-  next();
-};
+function buildLimiter({ prefix, windowSec, max, failOpen = true }) {
+  if (!prefix || !windowSec || !max) {
+    console.log(prefix)
+    console.log(windowSec)
+    console.log(max)
+    throw new Error('buildLimiter: prefix, windowSec and max are required');
+  }
+
+  return async function rateLimiter(req, res, next) {
+    try {
+      const ip  = req.ip;                       // trust‑proxy set at app level
+      const key = `${prefix}:${ip}`;
+      const n   = await redis.incr(key);
+      if (n === 1) await redis.expire(key, windowSec);
+      if (n > max) {
+        
+        res.set('Retry-After', windowSec);
+        return res.status(429).send('Too many requests');
+      }
+      return next();
+    } catch (err) {
+      console.error('Rate limiter error', err);
+
+      if (failOpen) return next();
+      return res.status(503).send('Rate‑limit service unavailable');
+    }
+  };
+}
+
+module.exports = buildLimiter;
